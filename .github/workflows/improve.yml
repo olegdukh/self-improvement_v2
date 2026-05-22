@@ -1,0 +1,64 @@
+name: AI Improvement
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  improve:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements.txt
+
+      - name: Run AI improvement
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/improve_code.py
+
+      - name: Configure git
+        run: |
+          git config user.name "AI-Agent"
+          git config user.email "ai@example.com"
+
+      - name: Create branch
+        run: |
+          BRANCH=ai-improvement-$(date +%s)
+
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+          git checkout -b $BRANCH
+
+      - name: Commit
+        run: |
+          git add .
+
+          git diff --cached --quiet ||           git commit -m "AI automated improvement"
+
+      - name: Push
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }} HEAD:${BRANCH}
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          branch: ${{ env.BRANCH }}
+          title: "AI Improvement"
+          body: |
+            Automated AI-generated safe improvement.

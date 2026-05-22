@@ -1,0 +1,81 @@
+name: PR Tests
+
+on:
+  pull_request:
+
+jobs:
+  deploy-runner:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install requests
+
+      - name: Generate runner token
+        id: token
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          TOKEN=$(curl -s -X POST             -H "Accept: application/vnd.github+json"             -H "Authorization: Bearer ${PAT_TOKEN}"             https://api.github.com/repos/${{ github.repository }}/actions/runners/registration-token             | jq -r .token)
+
+          echo "RUNNER_TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: Deploy VPS
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          RUNNER_TOKEN: ${{ env.RUNNER_TOKEN }}
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          chmod +x scripts/deploy_vps.sh
+          ./scripts/deploy_vps.sh
+
+      - name: Wait runner
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          python scripts/wait_for_runner.py
+
+  tests:
+    needs: deploy-runner
+
+    runs-on:
+      - self-hosted
+      - hetzner-ephemeral
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest tests/test_target.py
+
+  destroy-runner:
+    needs:
+      - deploy-runner
+      - tests
+
+    if: always()
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Destroy VPS
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SERVER_ID: ${{ env.SERVER_ID }}
+        run: |
+          chmod +x scripts/destroy_vps.sh
+          ./scripts/destroy_vps.sh
