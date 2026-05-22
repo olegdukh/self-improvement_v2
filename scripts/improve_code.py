@@ -5,7 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 
-import google.generativeai as genai
+from google import genai
 
 TARGET_FILE = Path("app/target_code.py")
 BACKUP_FILE = Path("app/target_code.py.bak")
@@ -28,9 +28,13 @@ STRICT RULES:
 """
 
 
-def configure():
-    api_key = os.environ["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+def get_client():
+    api_key = os.environ.get("GEMINI_API_KEY")
+
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY missing")
+
+    return genai.Client(api_key=api_key)
 
 
 def backup():
@@ -74,7 +78,7 @@ def validate_pipeline():
 
 
 def improve(code):
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = get_client()
 
     prompt = f"{PROMPT}\n\nCODE:\n{code}"
 
@@ -82,7 +86,10 @@ def improve(code):
 
     for attempt in range(retries):
         try:
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
 
             if not response.text:
                 raise RuntimeError("Empty Gemini response")
@@ -99,8 +106,6 @@ def improve(code):
 
 
 def main():
-    configure()
-
     original = TARGET_FILE.read_text()
 
     backup()
