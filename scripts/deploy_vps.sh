@@ -5,7 +5,7 @@ set -euo pipefail
 SERVER_NAME="ephemeral-runner-1779433558"
 
 IMAGE="ubuntu-24.04"
-TYPE="cx22"
+TYPE="cx23"
 LOCATION="fsn1"
 
 curl -L https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz | tar xz
