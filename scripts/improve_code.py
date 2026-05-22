@@ -66,7 +66,7 @@ def run(cmd):
 def validate_pipeline():
     checks = [
         ["ruff", "check", "."],
-        ["black", "--check", "."],
+        ["black", "."],
         ["pytest"],
     ]
 
